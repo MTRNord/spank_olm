@@ -1,0 +1,7 @@
+homepage: "https://github.com/MTRNord/spank-olm"
+language: c++
+primary_contact: "git@nordgedanken.dev"
+main_repo: 'https://github.com/MTRNord/spank-olm'
+
+fuzzing_engines:
+  - libfuzzer

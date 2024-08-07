@@ -14,3 +14,13 @@ option('build_tests',
        type : 'boolean',
        value : true,
        description : 'Build unit tests')
+
+option('botan_wasm_path',
+       type : 'string',
+       value : '',
+       description : 'Custom path for libbotan-3.a when targeting WASM')
+
+option('botan_include_path',
+       type : 'string',
+       value : '',
+       description : 'Custom path for botan include files')

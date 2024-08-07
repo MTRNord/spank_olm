@@ -34,7 +34,7 @@ TEST_CASE("Account sign and verify")
     account.new_account(rng);
 
     const std::string message = "Test message";
-    auto signature = account.sign(message);
+    auto signature = account.sign(rng, message);
 
     Botan::PK_Verifier verifier(account.identity_keys->ed25519_key, "Ed25519ph");
     verifier.update(message);

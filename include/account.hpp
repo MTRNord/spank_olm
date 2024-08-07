@@ -7,6 +7,13 @@
 
 #include "list.hpp"
 
+// Define a macro to detect Emscripten
+#ifdef __EMSCRIPTEN__
+#define EMSCRIPTEN_CONSTEXPR
+#else
+#define EMSCRIPTEN_CONSTEXPR constexpr
+#endif
+
 namespace spank_olm
 {
     /**
@@ -43,7 +50,7 @@ namespace spank_olm
         {
         }
 
-        Account(Account const&);
+        Account(Account const& other) = default;
 
         std::optional<IdentityKeys> identity_keys; ///< The identity keys for the account.
         FixedSizeArray<OneTimeKey, MAX_ONE_TIME_KEYS> one_time_keys; ///< The one-time keys for the account.
@@ -74,7 +81,7 @@ namespace spank_olm
          *
          * \return The JSON representation of the identity keys.
          */
-        [[nodiscard]] constexpr std::string get_identity_json() const
+        [[nodiscard]] EMSCRIPTEN_CONSTEXPR std::string get_identity_json() const
         {
             auto curve25519_key = identity_keys->curve25519_key.public_key()->raw_public_key_bits();
             auto ed25519_key = identity_keys->ed25519_key.public_key()->raw_public_key_bits();
@@ -89,10 +96,11 @@ namespace spank_olm
         /**
          * \brief Signs a message using the Ed25519 key.
          *
-         * @param message The message to sign.
-         * @return The signature of the message.
+         * \param rng The botan random number generator to use.
+         * \param message The message to sign.
+         * \return The signature of the message.
          */
-        [[nodiscard]] std::vector<uint8_t> sign(std::string_view message) const;
+        [[nodiscard]] std::vector<uint8_t> sign(Botan::RandomNumberGenerator& rng, std::string_view message) const;
 
 
         /**
@@ -112,7 +120,7 @@ namespace spank_olm
          *
          * @return Returns the JSON representation of the one time keys which haven't been published yet.
          */
-        [[nodiscard]] constexpr std::string get_one_time_keys_json()
+        [[nodiscard]] EMSCRIPTEN_CONSTEXPR std::string get_one_time_keys_json()
         {
             std::vector<std::string> stringified_keys;
 
@@ -188,7 +196,7 @@ namespace spank_olm
          * }
          * ```
          */
-        [[nodiscard]] std::string constexpr get_unpublished_fallback_key_json() const
+        [[nodiscard]] std::string EMSCRIPTEN_CONSTEXPR get_unpublished_fallback_key_json() const
         {
             if (!current_fallback_key || current_fallback_key->published)
             {

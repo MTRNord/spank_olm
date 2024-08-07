@@ -3,7 +3,7 @@ c = 'emcc'
 cpp = 'em++'
 ar = 'emar'
 strip = 'llvm-strip'
-pkgconfig = 'em-pkg-config'
+pkg-config = 'pkg-config'
 
 [host_machine]
 system = 'emscripten'

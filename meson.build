@@ -26,12 +26,22 @@ is_wasm = host_machine.system() == 'emscripten'
 
 # Add specific arguments for WASM
 if is_wasm
-    add_project_arguments('-s', 'WASM=1', '-s', 'MODULARIZE=1', '-s', 'EXPORT_NAME="createModule"', '-flto', language : 'cpp')
-    add_project_link_arguments('-s', 'WASM=1', '-s', 'MODULARIZE=1', '-s', 'EXPORT_NAME="createModule"', '-flto', language : 'cpp')
+    add_project_arguments('-flto', language : 'cpp')
+    add_project_link_arguments('-flto', '-lembind', '-sEMBIND_AOT=1', '-sEXPORT_ES6=1', '-sMODULARIZE=1', '-sENVIRONMENT=web', '-sEXPORT_NAME=SpankOlmLibrarys', '-sFILESYSTEM=0', '-sEXPORT_ALL=1', '--emit-tsd=interface.d.ts', language : 'cpp')
 endif
 
 # Cmake doesnt work with meson, so we need to require pkg-config
-botan_dep = dependency('botan-3', version : '>=3.6.0', required : true, method : 'pkg-config')
+if is_wasm
+    # Custom path for libbotan-3.a when targeting WASM
+    botan_wasm_path = get_option('botan_wasm_path')
+    botan_include_path = get_option('botan_include_path')
+    botan_incdir = include_directories(botan_include_path)
+    cc = meson.get_compiler('c')
+    botan_dep = cc.find_library('botan-3', dirs : meson.global_source_root() / botan_wasm_path, required : true, static : true)
+    botan_dep = declare_dependency(dependencies : botan_dep, include_directories : botan_incdir)
+else
+    botan_dep = dependency('botan-3', version : '>=3.6.0', required : true, method : 'pkg-config')
+endif
 
 spank_olm_deps = [botan_dep]
 
@@ -39,7 +49,11 @@ incdir = include_directories('include')
 # List of source files
 src_files = files('src/spank-olm.cpp', 'src/account.cpp')
 
-spank_olm = library('spank_olm', src_files, install : true, dependencies : spank_olm_deps, include_directories : incdir)
+if is_wasm
+    spank_olm = executable('spank_olm', src_files, install : true, dependencies : spank_olm_deps, include_directories : incdir, override_options : ['b_lto=false'])
+else
+    spank_olm = library('spank_olm', src_files, install : true, dependencies : spank_olm_deps, include_directories : incdir)
+endif
 
 spank_olm_dep = declare_dependency(
     include_directories : incdir,
@@ -47,32 +61,35 @@ spank_olm_dep = declare_dependency(
     dependencies : spank_olm_deps,
 )
 
-# Generate and install pkg-config file
-pkgconfig = {
-    'prefix' : get_option('prefix'),
-    'libdir' : get_option('libdir'),
-    'includedir' : join_paths(get_option('prefix'), get_option('includedir')),
-    'name' : 'spank-olm',
-    'description' : 'A C++ library based on libolm',
-    'version' : meson.project_version(),
-    'requires' : 'botan-3',
-    'libs' : '-L${libdir} -lspank_olm',
-    'cflags' : '-I${includedir}/spank-olm'
-}
-
-configure_file(
-    input : 'misc/spank-olm.pc.in',
-    output : 'spank-olm.pc',
-    configuration : pkgconfig,
-    install : true,
-    install_dir : join_paths(get_option('libdir'), 'pkgconfig')
-)
-
-if get_option('build_tests')
+if get_option('build_tests') and not is_wasm
     snitch_dep = dependency('snitch')
 
     test('list_test', executable('list_test', 'tests/list_test.cpp', dependencies : [snitch_dep, spank_olm_dep], include_directories : incdir))
     test('account_test', executable('account_test', 'tests/account_test.cpp', dependencies : [snitch_dep, spank_olm_dep], include_directories : incdir))
 endif
 
-subdir('fuzz')
+# Only build if we are not building wasm
+if not is_wasm
+    # Generate and install pkg-config file
+    pkgconfig = {
+        'prefix' : get_option('prefix'),
+        'libdir' : get_option('libdir'),
+        'includedir' : join_paths(get_option('prefix'), get_option('includedir')),
+        'name' : 'spank-olm',
+        'description' : 'A C++ library based on libolm',
+        'version' : meson.project_version(),
+        'requires' : 'botan-3',
+        'libs' : '-L${libdir} -lspank_olm',
+        'cflags' : '-I${includedir}/spank-olm'
+    }
+
+    configure_file(
+        input : 'misc/spank-olm.pc.in',
+        output : 'spank-olm.pc',
+        configuration : pkgconfig,
+        install : true,
+        install_dir : join_paths(get_option('libdir'), 'pkgconfig')
+    )
+
+    subdir('fuzz')
+endif

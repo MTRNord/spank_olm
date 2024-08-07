@@ -18,24 +18,27 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern int LLVMFuzzerTestOneInput(const unsigned char *data, size_t size);
-extern int LLVMFuzzerInitialize(int *argc, char ***argv);
-int main(int argc, char **argv) {
-    const char *progname;
+extern int LLVMFuzzerTestOneInput(const unsigned char* data, size_t size);
+extern int LLVMFuzzerInitialize(int* argc, char*** argv);
+
+int main(int argc, char** argv)
+{
+    const char* progname;
     if ((progname = strrchr(argv[0], '/')))
         progname++;
     else
         progname = argv[0];
     fprintf(stderr, "%s: running %d inputs\n", progname, argc - 1);
     LLVMFuzzerInitialize(&argc, &argv);
-    for (int i = 1; i < argc; i++) {
+    for (int i = 1; i < argc; i++)
+    {
         fprintf(stderr, "Running: %s\n", argv[i]);
-        FILE *f = fopen(argv[i], "r+");
+        FILE* f = fopen(argv[i], "r+");
         assert(f);
         fseek(f, 0, SEEK_END);
         long len = ftell(f);
         fseek(f, 0, SEEK_SET);
-        unsigned char *buf = (unsigned char*)malloc(len);
+        unsigned char* buf = (unsigned char*)malloc(len);
         size_t n_read = fread(buf, 1, len, f);
         fclose(f);
         assert(n_read == len);

@@ -39,6 +39,13 @@ meson setup build_static --default-library=static
 meson compile -C build_static
 ```
 
+To build wasm libraries:
+
+```sh
+meson setup build-wasm --cross-file wasm-cross-file.txt --default-library=static -Dbotan_wasm_path=../botan/ -Dbotan_include_path=../botan/build/include/public/ -Dcpp_std=c++2a
+meson compile -C build-wasm
+```
+
 ## Usage
 
 Include `spank_olm` in your C++ project and link against it. Refer to the source code for examples of how to use the

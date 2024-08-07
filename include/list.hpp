@@ -27,6 +27,22 @@ namespace spank_olm
         }
 
         /**
+         * \brief Copy constructor.
+         *
+         * \param other The FixedSizeArray to copy from.
+         */
+        FixedSizeArray(const FixedSizeArray& other)
+            : current_size(other.current_size)
+        {
+            data = std::make_unique<T*[]>(max_size + 1);
+            for (std::size_t i = 0; i < other.current_size; ++i)
+            {
+                data[i] = new T(*other.data[i]);
+            }
+        }
+
+
+        /**
          * \brief Destroys the FixedSizeArray and frees allocated memory.
          */
         ~FixedSizeArray()

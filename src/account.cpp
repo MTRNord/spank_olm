@@ -2,7 +2,7 @@
 #include "errors.hpp"
 
 #include <botan/pubkey.h>
-#include <botan/auto_rng.h>
+#include <botan/rng.h>
 
 /* Convenience macro for checking the return value of internal unpickling
  * functions and returning early on failure. */
@@ -365,10 +365,8 @@ namespace spank_olm
         }
     }
 
-    std::vector<uint8_t> Account::sign(const std::string_view message) const
+    std::vector<uint8_t> Account::sign(Botan::RandomNumberGenerator& rng, const std::string_view message) const
     {
-        Botan::AutoSeeded_RNG rng;
-
         // According to https://botan.randombit.net/handbook/api_ref/pubkey.html#ed25519-ed448-variants
         const std::string padding_scheme = "Ed25519ph";
 

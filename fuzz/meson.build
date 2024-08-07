@@ -10,35 +10,36 @@ if fuzzing_engine == 'libfuzzer'
 endif
 
 fuzz_progs = [
-    'olm_decryption_fuzzer'
+    'olm_decryption_fuzzer',
+    'olm_sign_fuzzer'
 ]
 
 fuzz_execs = []
 foreach fuzz_prog : fuzz_progs
     fuzz_execs += executable(fuzz_prog,
                              fuzz_prog + '.cpp',
-                             dependencies: [spank_olm_dep, fuzz_deps],
-                             link_args: fuzz_ldflags
+                             dependencies : [spank_olm_dep, fuzz_deps],
+                             link_args : fuzz_ldflags
     )
 endforeach
 
 # If the fuzzing engine is not OSS-Fuzz, build the unit tests to be run on CI
 if fuzzing_engine != 'oss-fuzz'
     test_fuzz = configure_file(
-        input: 'test_fuzz.sh',
-        output: 'test_fuzz.sh',
-        copy: true,
+        input : 'test_fuzz.sh',
+        output : 'test_fuzz.sh',
+        copy : true,
     )
 
     test(
         'fuzz',
         test_fuzz,
-        workdir: meson.current_build_dir(),
-        depends: [
+        workdir : meson.current_build_dir(),
+        depends : [
             fuzz_execs,
         ],
         # Increase the timeout as running the tests with sanitizers
         # enabled could be slower than the default 30 seconds.
-        timeout: 60,
+        timeout : 60,
     )
 endif

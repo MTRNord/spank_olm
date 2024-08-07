@@ -28,13 +28,16 @@ src_files = files('src/spank-olm.cpp', 'src/account.cpp')
 spank_olm = library('spank_olm', src_files, install : true, dependencies : spank_olm_deps, include_directories : incdir)
 
 spank_olm_dep = declare_dependency(
+    include_directories : incdir,
     link_with : spank_olm,
     dependencies : spank_olm_deps,
 )
 
-snitch_dep = dependency('snitch')
+if get_option('build_tests')
+    snitch_dep = dependency('snitch')
 
-test('list_test', executable('list_test', 'tests/list_test.cpp', dependencies : [snitch_dep, spank_olm_dep], include_directories : incdir))
-test('account_test', executable('account_test', 'tests/account_test.cpp', dependencies : [snitch_dep, spank_olm_dep], include_directories : incdir))
+    test('list_test', executable('list_test', 'tests/list_test.cpp', dependencies : [snitch_dep, spank_olm_dep], include_directories : incdir))
+    test('account_test', executable('account_test', 'tests/account_test.cpp', dependencies : [snitch_dep, spank_olm_dep], include_directories : incdir))
+endif
 
 subdir('fuzz')

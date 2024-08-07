@@ -22,3 +22,5 @@ build.ninja
 compile_commands.json
 
 .idea
+
+fuzz/corpuses/sign

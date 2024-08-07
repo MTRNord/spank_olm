@@ -18,7 +18,7 @@ popd
 
 # spank-olm
 meson setup build --prefix="${WORK}" --libdir=lib --prefer-static --default-library=static --buildtype=debugoptimized \
-  -Dfuzzing_engine=oss-fuzz -Dfuzzer_ldflags="$LIB_FUZZING_ENGINE" \
+  -Dfuzzing_engine=oss-fuzz -Dfuzzer_ldflags="$LIB_FUZZING_ENGINE" -Db_lto=false -Db_thinlto_cache=false -Dbuild_tests=false \
   -Dcpp_link_args="$LDFLAGS -Wl,-rpath=\$ORIGIN"
 meson install -C build --tag devel
 

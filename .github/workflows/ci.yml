@@ -55,7 +55,6 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/randombit/botan.git
           pushd botan
-          git checkout release-3
           ./configure.py --prefix="${{ github.workspace }}/botan-install"
           make -j$(nproc)
           make install

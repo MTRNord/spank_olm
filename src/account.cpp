@@ -7,25 +7,24 @@
 /* Convenience macro for checking the return value of internal unpickling
  * functions and returning early on failure. */
 #ifndef UNPICKLE_OK
-#define UNPICKLE_OK(x) do { if (!(x)) return NULL; } while(0)
+#define UNPICKLE_OK(x) do { if (!(x)) return nullptr; } while(0)
 #endif
 
 
 namespace spank_olm
 {
     /**
- * Serializes a 32-bit unsigned integer into a byte array.
- *
- * @param pos Pointer to the current position in the byte array.
- * @param value The 32-bit unsigned integer to serialize.
- * @return Pointer to the position in the byte array after the serialized data.
- */
+     * Serializes a 32-bit unsigned integer into a byte array.
+     *
+     * @param pos Pointer to the current position in the byte array.
+     * @param value The 32-bit unsigned integer to serialize.
+     * @return Pointer to the position in the byte array after the serialized data.
+     */
     std::uint8_t* pickle(std::uint8_t* pos, std::uint32_t value)
     {
-        pos += 4;
-        for (unsigned i = 4; i--;)
+        for (int i = 3; i >= 0; --i)
         {
-            *(--pos) = value;
+            pos[i] = value & 0xFF;
             value >>= 8;
         }
         return pos + 4;
@@ -41,14 +40,9 @@ namespace spank_olm
      */
     std::uint8_t const* unpickle(std::uint8_t const* pos, std::uint8_t const* end, std::uint32_t& value)
     {
-        value = 0;
         if (!pos || end < pos + 4) return nullptr;
-        for (unsigned i = 4; i--;)
-        {
-            value <<= 8;
-            value |= *(pos++);
-        }
-        return pos;
+        value = (pos[0] << 24) | (pos[1] << 16) | (pos[2] << 8) | pos[3];
+        return pos + 4;
     }
 
     /**
@@ -115,12 +109,12 @@ namespace spank_olm
 
 
     /**
-   * Serializes a std::vector<uint8_t> into a byte array.
-   *
-   * @param pos Pointer to the current position in the byte array.
-   * @param value The Botan::secure_vector<uint8_t> to serialize.
-   * @return Pointer to the position in the byte array after the serialized data.
-   */
+       * Serializes a std::vector<uint8_t> into a byte array.
+       *
+       * @param pos Pointer to the current position in the byte array.
+       * @param value The Botan::secure_vector<uint8_t> to serialize.
+       * @return Pointer to the position in the byte array after the serialized data.
+       */
     std::uint8_t* pickle(std::uint8_t* pos, const std::vector<uint8_t>& value)
     {
         pos = pickle(pos, static_cast<std::uint32_t>(value.size()));
@@ -154,8 +148,7 @@ namespace spank_olm
     {
         pos = pickle(pos, value->id);
         pos = pickle(pos, value->published);
-        pos = pickle(pos, value->key.raw_private_key_bits());
-        return pos;
+        return pickle(pos, value->key.raw_private_key_bits());
     }
 
     /**
@@ -173,13 +166,17 @@ namespace spank_olm
         bool published; ///< Indicates whether the key has been published.
 
         pos = unpickle(pos, end, id);
-        if (!id)
+        if (!pos || !id)
         {
             return {nullptr, std::nullopt};
         }
         pos = unpickle(pos, end, published);
+        if (!pos) return {nullptr, std::nullopt};
+
         Botan::secure_vector<uint8_t> key_bits;
         pos = unpickle(pos, end, key_bits);
+        if (!pos) return {nullptr, std::nullopt};
+
         auto otk = OneTimeKey{id, published, Botan::X25519_PrivateKey(key_bits)};
 
         return {pos, otk};
@@ -233,11 +230,7 @@ namespace spank_olm
         while (size-- && pos != end)
         {
             auto [temp_pos, value] = unpickle_otk(pos, end);
-            pos = temp_pos;
-            if (!pos)
-            {
-                return nullptr;
-            }
+            if (!((pos = temp_pos))) return nullptr;
             list.insert(value.value());
         }
 
@@ -292,8 +285,7 @@ namespace spank_olm
         pos = pickle(pos, value->ed25519_key.public_key()->raw_public_key_bits());
         pos = pickle(pos, value->ed25519_key.raw_private_key_bits());
         pos = pickle(pos, value->curve25519_key.public_key()->raw_public_key_bits());
-        pos = pickle(pos, value->curve25519_key.raw_private_key_bits());
-        return pos;
+        return pickle(pos, value->curve25519_key.raw_private_key_bits());
     }
 
     /**
@@ -310,15 +302,16 @@ namespace spank_olm
     {
         if (!pos || pos == end) return nullptr;
         Botan::secure_vector<uint8_t> ed25519_public_key_bits;
+        Botan::secure_vector<uint8_t> curve25519_public_key_bits;
+        Botan::secure_vector<uint8_t> ed25519_private_key_bits;
+        Botan::secure_vector<uint8_t> curve25519_private_key_bits;
+
         pos = unpickle(pos, end, ed25519_public_key_bits);
         UNPICKLE_OK(pos);
-        Botan::secure_vector<uint8_t> ed25519_private_key_bits;
         pos = unpickle(pos, end, ed25519_private_key_bits);
         UNPICKLE_OK(pos);
-        Botan::secure_vector<uint8_t> curve25519_public_key_bits;
         pos = unpickle(pos, end, curve25519_public_key_bits);
         UNPICKLE_OK(pos);
-        Botan::secure_vector<uint8_t> curve25519_private_key_bits;
         pos = unpickle(pos, end, curve25519_private_key_bits);
         UNPICKLE_OK(pos);
         value = IdentityKeys{
@@ -363,14 +356,10 @@ namespace spank_olm
 
         // Make sure we check the key pairs.
         if (!identity_keys->ed25519_key.check_key(rng, false) ||
-            !identity_keys->curve25519_key.check_key(rng, false))
-        {
-            throw SpankOlmErrorKeyGeneration();
-        }
-
-        // Verify the public keys using the respective check_key methods.
-        if (!identity_keys->ed25519_key.public_key()->check_key(rng, false) ||
-            !identity_keys->curve25519_key.public_key()->check_key(rng, false))
+            !identity_keys->curve25519_key.check_key(rng, false) ||
+            !identity_keys->ed25519_key.public_key()->check_key(rng, false) ||
+            !identity_keys->curve25519_key.public_key()->check_key(rng, false)
+        )
         {
             throw SpankOlmErrorKeyGeneration();
         }
@@ -401,7 +390,7 @@ namespace spank_olm
             if (!key->published)
             {
                 key->published = true;
-                count++;
+                ++count;
             }
         }
 
@@ -413,25 +402,20 @@ namespace spank_olm
     {
         for (std::size_t i = 0; i < number_of_keys; ++i)
         {
-            one_time_keys.insert(OneTimeKey{++next_one_time_key_id, false, Botan::X25519_PrivateKey(rng)});
+            one_time_keys.insert({++next_one_time_key_id, false, Botan::X25519_PrivateKey(rng)});
         }
     }
 
     void Account::generate_fallback_key(Botan::RandomNumberGenerator& rng)
     {
-        if (num_fallback_keys < 2)
-        {
-            num_fallback_keys++;
-        }
         prev_fallback_key = current_fallback_key;
         current_fallback_key = OneTimeKey{++next_one_time_key_id, false, Botan::X25519_PrivateKey(rng)};
     }
 
     void Account::forget_old_fallback_key()
     {
-        if (num_fallback_keys >= 2)
+        if (current_fallback_key && prev_fallback_key)
         {
-            num_fallback_keys = 1;
             // TODO: Verify if this is correct.
             prev_fallback_key.reset();
         }
@@ -446,12 +430,12 @@ namespace spank_olm
                 return one_time_key;
             }
         }
-        if (num_fallback_keys >= 1 && current_fallback_key->key.public_key()->raw_public_key_bits() == key.
+        if (current_fallback_key && current_fallback_key->key.public_key()->raw_public_key_bits() == key.
             raw_public_key_bits())
         {
             return &current_fallback_key.value();
         }
-        if (num_fallback_keys >= 2 && prev_fallback_key->key.public_key()->raw_public_key_bits() == key.
+        if (prev_fallback_key && prev_fallback_key->key.public_key()->raw_public_key_bits() == key.
             raw_public_key_bits())
         {
             return &current_fallback_key.value();
@@ -503,12 +487,18 @@ namespace spank_olm
 
         pos = spank_olm::pickle(pos, one_time_keys);
 
-        pos = spank_olm::pickle(pos, num_fallback_keys);
+        // Calculate the number of fallback keys
+        std::uint8_t fallback_key_count = 0;
+        if (current_fallback_key && current_fallback_key->published) fallback_key_count++;
+        if (prev_fallback_key && prev_fallback_key->published) fallback_key_count++;
 
-        if (num_fallback_keys >= 1)
+        // Serialize the fallback key count
+        pos = spank_olm::pickle(pos, fallback_key_count);
+
+        if (current_fallback_key)
         {
             pos = spank_olm::pickle(pos, current_fallback_key);
-            if (num_fallback_keys >= 2)
+            if (prev_fallback_key)
             {
                 pos = spank_olm::pickle(pos, prev_fallback_key);
             }
@@ -566,11 +556,7 @@ namespace spank_olm
             throw SpankOlmErrorCorruptedAccountPickle();
         }
 
-        if (pickle_version <= 2)
-        {
-            value.num_fallback_keys = 0;
-        }
-        else if (pickle_version == 3)
+        if (pickle_version == 3)
         {
             pos = spank_olm::unpickle(pos, end, value.current_fallback_key);
             if (!pos)
@@ -582,44 +568,30 @@ namespace spank_olm
             {
                 throw SpankOlmErrorCorruptedAccountPickle();
             }
-            if (value.current_fallback_key->published)
-            {
-                if (value.prev_fallback_key->published)
-                {
-                    value.num_fallback_keys = 2;
-                }
-                else
-                {
-                    value.num_fallback_keys = 1;
-                }
-            }
-            else
-            {
-                value.num_fallback_keys = 0;
-            }
         }
         else
         {
-            pos = spank_olm::unpickle(pos, end, value.num_fallback_keys);
+            std::uint8_t num_fallback_keys;
+            pos = spank_olm::unpickle(pos, end, num_fallback_keys);
             if (!pos)
             {
                 throw SpankOlmErrorCorruptedAccountPickle();
             }
-            if (value.num_fallback_keys >= 1)
+            if (num_fallback_keys >= 1)
             {
                 pos = spank_olm::unpickle(pos, end, value.current_fallback_key);
                 if (!pos)
                 {
                     throw SpankOlmErrorCorruptedAccountPickle();
                 }
-                if (value.num_fallback_keys >= 2)
+                if (num_fallback_keys >= 2)
                 {
                     pos = spank_olm::unpickle(pos, end, value.prev_fallback_key);
                     if (!pos)
                     {
                         throw SpankOlmErrorCorruptedAccountPickle();
                     }
-                    if (value.num_fallback_keys >= 3)
+                    if (num_fallback_keys >= 3)
                     {
                         throw SpankOlmErrorCorruptedAccountPickle();
                     }

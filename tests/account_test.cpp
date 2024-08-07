@@ -24,7 +24,6 @@ TEST_CASE("Account serialization and deserialization")
         account.identity_keys->curve25519_key.public_key()->raw_public_key_bits() == deserialized.identity_keys->
         curve25519_key.public_key()->raw_public_key_bits());
     REQUIRE(account.one_time_keys.size() == deserialized.one_time_keys.size());
-    REQUIRE(account.num_fallback_keys == deserialized.num_fallback_keys);
     REQUIRE(account.next_one_time_key_id == deserialized.next_one_time_key_id);
 }
 
@@ -67,13 +66,10 @@ TEST_CASE("Account generate and forget fallback key")
     account.new_account(rng);
     account.generate_fallback_key(rng);
 
-    REQUIRE(account.num_fallback_keys == 1);
 
     account.generate_fallback_key(rng);
-    REQUIRE(account.num_fallback_keys == 2);
 
     account.forget_old_fallback_key();
-    REQUIRE(account.num_fallback_keys == 1);
     REQUIRE(account.prev_fallback_key == std::nullopt);
 }
 

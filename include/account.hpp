@@ -39,8 +39,7 @@ namespace spank_olm
 
     struct Account
     {
-        Account() : num_fallback_keys(0),
-                    next_one_time_key_id(0)
+        Account() : next_one_time_key_id(0)
         {
         }
 
@@ -48,7 +47,6 @@ namespace spank_olm
 
         std::optional<IdentityKeys> identity_keys; ///< The identity keys for the account.
         FixedSizeArray<OneTimeKey, MAX_ONE_TIME_KEYS> one_time_keys; ///< The one-time keys for the account.
-        std::uint8_t num_fallback_keys; ///< The number of fallback keys.
         std::optional<OneTimeKey> current_fallback_key; ///< The current fallback key.
         std::optional<OneTimeKey> prev_fallback_key; ///< The previous fallback key.
         std::uint32_t next_one_time_key_id; ///< The identifier for the next one-time key.

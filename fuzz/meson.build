@@ -10,7 +10,6 @@ if fuzzing_engine == 'libfuzzer'
 endif
 
 fuzz_progs = [
-    'olm_decryption_fuzzer',
     'olm_sign_fuzzer'
 ]
 

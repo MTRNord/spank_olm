@@ -33,6 +33,27 @@ spank_olm_dep = declare_dependency(
     dependencies : spank_olm_deps,
 )
 
+# Generate and install pkg-config file
+pkgconfig = {
+    'prefix' : get_option('prefix'),
+    'libdir' : get_option('libdir'),
+    'includedir' : join_paths(get_option('prefix'), get_option('includedir')),
+    'name' : 'spank-olm',
+    'description' : 'A C++ library based on libolm',
+    'version' : meson.project_version(),
+    'requires' : 'botan-3',
+    'libs' : '-L${libdir} -lspank_olm',
+    'cflags' : '-I${includedir}/spank-olm'
+}
+
+configure_file(
+    input : 'misc/spank-olm.pc.in',
+    output : 'spank-olm.pc',
+    configuration : pkgconfig,
+    install : true,
+    install_dir : join_paths(get_option('libdir'), 'pkgconfig')
+)
+
 if get_option('build_tests')
     snitch_dep = dependency('snitch')
 

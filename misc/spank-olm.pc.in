@@ -1,0 +1,10 @@
+prefix=@prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: @name@
+Description: @description@
+Version: @version@
+Requires: @requires@
+Libs: @libs@
+Cflags: @cflags@

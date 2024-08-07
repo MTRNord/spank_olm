@@ -1,0 +1,112 @@
+name: CI
+
+on: [ push, pull_request, workflow_dispatch ]
+
+permissions: { }
+
+jobs:
+  CI:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "Linux x64 (Ubuntu 24.04) - GCC 14"
+            os: ubuntu-24.04
+            build: { cc: gcc-14, cxx: g++-14, linker: ld }
+
+          - name: "Linux x64 (Ubuntu 24.04) - Clang 18 with ASan and UBSan"
+            os: ubuntu-24.04
+            build: { cc: clang-18, cxx: clang++-18, linker: ld.lld-18, sanitize: true }
+
+          - name: "macOS arm64 (14) - Xcode 15"
+            os: macos-14
+            build: { cc: clang, cxx: clang++, linker: ld.lld }
+
+    env:
+      CC: ${{ matrix.build.cc }}
+      CXX: ${{ matrix.build.cxx }}
+      LD: ${{ matrix.build.linker }}
+      CPPFLAGS: -Wall
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Ubuntu dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: |
+          pip3 install meson --break-system-packages
+          brew install \
+            ninja pkg-config
+
+      - name: Install Clang 18
+        if: runner.os == 'Linux' && matrix.build.cc == 'clang-18'
+        run: sudo apt-get install clang-18 libomp-18-dev lld-18 llvm-18
+
+      - name: Build and install Botan
+        run: |
+          git clone --depth 1 https://github.com/randombit/botan.git
+          pushd botan
+          git checkout release-3
+          ./configure.py --prefix="${{ github.workspace }}/botan-install"
+          make -j$(nproc)
+          make install
+          popd
+          echo "PKG_CONFIG_PATH=${{ github.workspace }}/botan-install/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "CPPFLAGS=-I${{ github.workspace }}/botan-install/include $CPPFLAGS" >> $GITHUB_ENV
+          echo "LDFLAGS=-L${{ github.workspace }}/botan-install/lib $LDFLAGS" >> $GITHUB_ENV
+
+
+      - name: Prepare macOS environment
+        if: runner.os == 'macOS'
+        run: |
+          echo "PKG_CONFIG_PATH=$(brew --prefix botan)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+
+      - name: Prepare sanitizers
+        if: matrix.build.sanitize
+        env:
+          LLVM_PREFIX: /usr/lib/llvm-18
+        run: |
+          ASAN_DSO=`$CC -print-file-name=libclang_rt.asan-x86_64.so`
+          echo "LDSHARED=$CC -shared" >> $GITHUB_ENV
+          echo "CPPFLAGS=-g -fsanitize=address,undefined -fno-sanitize=function -fno-omit-frame-pointer -fopenmp -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION" >> $GITHUB_ENV
+          echo "LDFLAGS=-g -fsanitize=address,undefined -shared-libasan -fopenmp=libomp" >> $GITHUB_ENV
+          echo "ASAN_DSO=$ASAN_DSO" >> $GITHUB_ENV
+          # Glib is built without -fno-omit-frame-pointer. We need
+          # to disable the fast unwinder to get full stacktraces.
+          echo "ASAN_OPTIONS=suppressions=${{ github.workspace }}/suppressions/asan.supp:fast_unwind_on_malloc=0:allocator_may_return_null=1" >> $GITHUB_ENV
+          echo "LSAN_OPTIONS=suppressions=${{ github.workspace }}/suppressions/lsan.supp:fast_unwind_on_malloc=0" >> $GITHUB_ENV
+          echo "TSAN_OPTIONS=suppressions=${{ github.workspace }}/suppressions/tsan.supp" >> $GITHUB_ENV
+          # Ensure UBSan issues causes the program to abort.
+          echo "UBSAN_OPTIONS=suppressions=${{ github.workspace }}/suppressions/ubsan.supp:halt_on_error=1:abort_on_error=1:print_stacktrace=1" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$LLVM_PREFIX/lib:`dirname $ASAN_DSO`" >> $GITHUB_ENV
+          echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
+
+      - name: Configure spank-olm
+        run: |
+          meson setup build \
+            -Ddebug=true \
+          || (cat build/meson-logs/meson-log.txt && exit 1)
+
+      - name: Build spank-olm
+        run: meson compile -C build
+
+      - name: Check spank-olm
+        run: |
+          meson test -C build \
+          || (cat build/meson-logs/testlog.txt && exit 1)
+
+      - name: Install spank-olm
+        run: sudo meson install -C build
+
+      - name: Rebuild the shared library cache
+        if: runner.os == 'Linux'
+        run: sudo ldconfig

@@ -52,18 +52,6 @@ jobs:
         if: runner.os == 'Linux' && matrix.build.cc == 'clang-18'
         run: sudo apt-get install clang-18 libomp-18-dev lld-18 llvm-18
 
-      - name: Build and install Botan
-        run: |
-          git clone --depth 1 https://github.com/randombit/botan.git
-          pushd botan
-          ./configure.py --prefix="${{ github.workspace }}/botan-install"
-          make -j$(nproc)
-          make install
-          popd
-          echo "PKG_CONFIG_PATH=${{ github.workspace }}/botan-install/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-          echo "CPPFLAGS=-I${{ github.workspace }}/botan-install/include $CPPFLAGS" >> $GITHUB_ENV
-          echo "LDFLAGS=-L${{ github.workspace }}/botan-install/lib $LDFLAGS" >> $GITHUB_ENV
-
 
       - name: Prepare macOS environment
         if: runner.os == 'macOS'
@@ -89,6 +77,18 @@ jobs:
           echo "UBSAN_OPTIONS=suppressions=${{ github.workspace }}/suppressions/ubsan.supp:halt_on_error=1:abort_on_error=1:print_stacktrace=1" >> $GITHUB_ENV
           echo "LD_LIBRARY_PATH=$LLVM_PREFIX/lib:`dirname $ASAN_DSO`" >> $GITHUB_ENV
           echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
+
+      - name: Build and install Botan
+        run: |
+          git clone --depth 1 https://github.com/randombit/botan.git
+          pushd botan
+          ./configure.py --prefix="${{ github.workspace }}/botan-install"
+          make -j$(nproc)
+          make install
+          popd
+          echo "PKG_CONFIG_PATH=${{ github.workspace }}/botan-install/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "CPPFLAGS=-I${{ github.workspace }}/botan-install/include $CPPFLAGS" >> $GITHUB_ENV
+          echo "LDFLAGS=-L${{ github.workspace }}/botan-install/lib $LDFLAGS" >> $GITHUB_ENV
 
       - name: Configure spank-olm
         run: |

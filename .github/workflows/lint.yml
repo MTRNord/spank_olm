@@ -15,6 +15,8 @@ jobs:
           style: file
           version: 18 # Ubuntu 24.04 provides clang-format-18
           lines-changed-only: true
+          # ignore bundled files
+          ignore: 'fuzz/StandaloneFuzzTargetMain.c'
 
       - name: Fail fast
         continue-on-error: true # TODO: remove this line in the future

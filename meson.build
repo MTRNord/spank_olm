@@ -1,10 +1,15 @@
-project('spank-olm', 'cpp',
+project('spank-olm', 'c', 'cpp',
         version : '1.0.0',
-        default_options : ['warning_level=3',
-                           'cpp_std=c++23',
-                           'b_lto=true',
-                           'b_thinlto_cache=true',
-                           'warning_level=3', ])
+        default_options : [
+            'c_std=c11',
+            'cpp_std=c++23',
+            'b_lto=true',
+            'b_thinlto_cache=true',
+            'warning_level=3',
+            # do a release (optimised) build by default
+            'buildtype=release',
+            # turn off asserts etc. in release mode
+            'b_ndebug=if-release'])
 
 # libFuzzer related things
 fuzzing_engine = get_option('fuzzing_engine')
@@ -14,6 +19,15 @@ if fuzzing_engine == 'libfuzzer'
     endif
     fuzzer_args = ['-fsanitize=fuzzer-no-link', '-fsanitize=fuzzer']
     add_project_arguments(cc.first_supported_argument(fuzzer_args), language : ['cpp', 'c'])
+endif
+
+# Check if we are building for WASM
+is_wasm = host_machine.system() == 'emscripten'
+
+# Add specific arguments for WASM
+if is_wasm
+    add_project_arguments('-s', 'WASM=1', '-s', 'MODULARIZE=1', '-s', 'EXPORT_NAME="createModule"', '-flto', language : 'cpp')
+    add_project_link_arguments('-s', 'WASM=1', '-s', 'MODULARIZE=1', '-s', 'EXPORT_NAME="createModule"', '-flto', language : 'cpp')
 endif
 
 # Cmake doesnt work with meson, so we need to require pkg-config

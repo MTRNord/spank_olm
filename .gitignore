@@ -24,3 +24,5 @@ compile_commands.json
 .idea
 
 fuzz/corpuses/sign
+
+build-wasm

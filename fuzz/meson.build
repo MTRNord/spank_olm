@@ -5,7 +5,12 @@ if get_option('fuzzer_ldflags') != ''
     fuzz_ldflags += [get_option('fuzzer_ldflags')]
 endif
 
-if fuzzing_engine == 'libfuzzer'
+if fuzzing_engine == 'none'
+    standalone_engine = static_library('standalone_engine',
+                                       'StandaloneFuzzTargetMain.c'
+    )
+    fuzz_deps += declare_dependency(link_with : standalone_engine)
+elif fuzzing_engine == 'libfuzzer'
     fuzz_ldflags += ['-fsanitize=fuzzer']
 endif
 

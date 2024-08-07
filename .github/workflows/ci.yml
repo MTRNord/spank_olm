@@ -38,7 +38,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install
+          sudo apt-get install \
+            meson pkg-config
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'

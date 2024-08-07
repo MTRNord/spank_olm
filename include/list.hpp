@@ -1,7 +1,6 @@
 #pragma once
 #include <cstddef>
 #include <iostream>
-#include <iterator>
 #include <utility>
 #include <memory>
 
@@ -24,7 +23,7 @@ namespace spank_olm
          */
         FixedSizeArray() : current_size(0)
         {
-            data = std::make_unique<T*[]>(max_size);
+            data = std::make_unique<T*[]>(max_size + 1);
         }
 
         /**
@@ -86,6 +85,7 @@ namespace spank_olm
                 }
                 data[index] = new T(value);
             }
+
             return SUCCESS;
         }
 

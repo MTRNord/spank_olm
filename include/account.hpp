@@ -209,12 +209,12 @@ namespace spank_olm
         /**
          * \brief Lookup a one time key with the given public key
          */
-        [[nodiscard]] std::optional<OneTimeKey const*> lookup_key(Botan::X25519_PublicKey const& key) const;
+        [[nodiscard]] std::optional<OneTimeKey const*> lookup_key(Botan::Public_Key const& key) const;
 
         /**
          * \brief Remove a one time key with the given public key
          */
-        void remove_key(Botan::X25519_PublicKey const& key);
+        void remove_key(Botan::Public_Key const& key);
 
         [[nodiscard]] std::vector<uint8_t> pickle() const;
 

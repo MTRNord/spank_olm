@@ -34,6 +34,7 @@ spank_olm_dep = declare_dependency(
 
 snitch_dep = dependency('snitch')
 
-test('list_test', executable('spank-olm-test', 'tests/list_test.cpp', dependencies : [snitch_dep, spank_olm_dep], include_directories : incdir))
+test('list_test', executable('list_test', 'tests/list_test.cpp', dependencies : [snitch_dep, spank_olm_dep], include_directories : incdir))
+test('account_test', executable('account_test', 'tests/account_test.cpp', dependencies : [snitch_dep, spank_olm_dep], include_directories : incdir))
 
 subdir('fuzz')

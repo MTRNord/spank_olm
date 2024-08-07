@@ -20,13 +20,15 @@ namespace spank_olm
  * @param value The 32-bit unsigned integer to serialize.
  * @return Pointer to the position in the byte array after the serialized data.
  */
-    std::uint8_t* pickle(std::uint8_t* pos, const std::uint32_t value)
+    std::uint8_t* pickle(std::uint8_t* pos, std::uint32_t value)
     {
-        for (int i = 3; i >= 0; --i)
+        pos += 4;
+        for (unsigned i = 4; i--;)
         {
-            *(pos++) = (value >> (i * 8)) & 0xFF;
+            *(--pos) = value;
+            value >>= 8;
         }
-        return pos;
+        return pos + 4;
     }
 
     /**
@@ -41,9 +43,10 @@ namespace spank_olm
     {
         value = 0;
         if (!pos || end < pos + 4) return nullptr;
-        for (unsigned i = 0; i < 4; ++i)
+        for (unsigned i = 4; i--;)
         {
-            value = (value << 8) | *(pos++);
+            value <<= 8;
+            value |= *(pos++);
         }
         return pos;
     }
@@ -145,21 +148,13 @@ namespace spank_olm
         return pos + size;
     }
 
-    /**
- * Serializes a OneTimeKey object into a byte array.
- *
- * @param pos Pointer to the current position in the byte array.
- * @param value The OneTimeKey object to serialize.
- * @return Pointer to the position in the byte array after the serialized data.
- */
-    static std::uint8_t* pickle(
+    std::uint8_t* pickle(
         std::uint8_t* pos,
-        OneTimeKey const& value
-    )
+        const std::optional<OneTimeKey>& value)
     {
-        pos = pickle(pos, value.id);
-        pos = pickle(pos, value.published);
-        pos = pickle(pos, value.key.private_key_bits());
+        pos = pickle(pos, value->id);
+        pos = pickle(pos, value->published);
+        pos = pickle(pos, value->key.raw_private_key_bits());
         return pos;
     }
 
@@ -168,23 +163,26 @@ namespace spank_olm
      *
      * @param pos Pointer to the current position in the byte array.
      * @param end Pointer to the end of the byte array.
-     * @param value Reference to the OneTimeKey object to store the deserialized value.
-     * @return Pointer to the position in the byte array after the deserialized data, or nullptr on failure.
+     * @return A pair containing the pointer to the position in the byte array after the deserialized data and the deserialized OneTimeKey object.
      */
-    static std::uint8_t const* unpickle(
-        std::uint8_t const* pos, std::uint8_t const* end,
-        OneTimeKey& value
+    static std::pair<std::uint8_t const*, std::optional<OneTimeKey>> unpickle_otk(
+        std::uint8_t const* pos, std::uint8_t const* end
     )
     {
-        pos = unpickle(pos, end, value.id);
-        UNPICKLE_OK(pos);
-        pos = unpickle(pos, end, value.published);
-        UNPICKLE_OK(pos);
+        std::uint32_t id; ///< The unique identifier for the one-time key.
+        bool published; ///< Indicates whether the key has been published.
+
+        pos = unpickle(pos, end, id);
+        if (!id)
+        {
+            return {nullptr, std::nullopt};
+        }
+        pos = unpickle(pos, end, published);
         Botan::secure_vector<uint8_t> key_bits;
         pos = unpickle(pos, end, key_bits);
-        UNPICKLE_OK(pos);
-        value.key = Botan::X25519_PrivateKey(key_bits);
-        return pos;
+        auto otk = OneTimeKey{id, published, Botan::X25519_PrivateKey(key_bits)};
+
+        return {pos, otk};
     }
 
     /**
@@ -205,7 +203,7 @@ namespace spank_olm
         pos = pickle(pos, static_cast<std::uint32_t>(list.size()));
         for (auto const& value : list)
         {
-            pos = spank_olm::pickle(pos, *value);
+            pos = pickle(pos, *value);
         }
         return pos;
     }
@@ -213,17 +211,16 @@ namespace spank_olm
     /**
      * Deserializes a FixedSizeArray object from a byte array.
      *
-     * @tparam T The type of elements in the FixedSizeArray.
      * @tparam max_size The maximum size of the FixedSizeArray.
      * @param pos Pointer to the current position in the byte array.
      * @param end Pointer to the end of the byte array.
      * @param list Reference to the FixedSizeArray object to store the deserialized values.
      * @return Pointer to the position in the byte array after the deserialized data, or nullptr on failure.
      */
-    template <typename T, std::size_t max_size>
+    template <std::size_t max_size>
     std::uint8_t const* unpickle(
         std::uint8_t const* pos, std::uint8_t const* end,
-        FixedSizeArray<T, max_size>& list
+        FixedSizeArray<OneTimeKey, max_size>& list
     )
     {
         std::uint32_t size;
@@ -235,13 +232,13 @@ namespace spank_olm
 
         while (size-- && pos != end)
         {
-            T value;
-            pos = spank_olm::unpickle(pos, end, value);
+            auto [temp_pos, value] = unpickle_otk(pos, end);
+            pos = temp_pos;
             if (!pos)
             {
                 return nullptr;
             }
-            list.insert(value);
+            list.insert(value.value());
         }
 
         return pos;
@@ -440,7 +437,7 @@ namespace spank_olm
         }
     }
 
-    std::optional<OneTimeKey const*> Account::lookup_key(Botan::X25519_PublicKey const& key) const
+    std::optional<OneTimeKey const*> Account::lookup_key(Botan::Public_Key const& key) const
     {
         for (const auto& one_time_key : one_time_keys)
         {
@@ -462,7 +459,7 @@ namespace spank_olm
         return std::nullopt;
     }
 
-    void Account::remove_key(Botan::X25519_PublicKey const& key)
+    void Account::remove_key(Botan::Public_Key const& key)
     {
         // Use iterator to find and remove the key.
         for (const auto& one_time_key : one_time_keys)
@@ -510,10 +507,10 @@ namespace spank_olm
 
         if (num_fallback_keys >= 1)
         {
-            pos = spank_olm::pickle(pos, current_fallback_key->key.raw_private_key_bits());
+            pos = spank_olm::pickle(pos, current_fallback_key);
             if (num_fallback_keys >= 2)
             {
-                pos = spank_olm::pickle(pos, prev_fallback_key->key.raw_private_key_bits());
+                pos = spank_olm::pickle(pos, prev_fallback_key);
             }
         }
 
@@ -559,7 +556,15 @@ namespace spank_olm
         }
 
         pos = spank_olm::unpickle(pos, end, value.identity_keys);
+        if (!pos)
+        {
+            throw SpankOlmErrorCorruptedAccountPickle();
+        }
         pos = spank_olm::unpickle(pos, end, value.one_time_keys);
+        if (!pos)
+        {
+            throw SpankOlmErrorCorruptedAccountPickle();
+        }
 
         if (pickle_version <= 2)
         {
@@ -568,7 +573,15 @@ namespace spank_olm
         else if (pickle_version == 3)
         {
             pos = spank_olm::unpickle(pos, end, value.current_fallback_key);
+            if (!pos)
+            {
+                throw SpankOlmErrorCorruptedAccountPickle();
+            }
             pos = spank_olm::unpickle(pos, end, value.prev_fallback_key);
+            if (!pos)
+            {
+                throw SpankOlmErrorCorruptedAccountPickle();
+            }
             if (value.current_fallback_key->published)
             {
                 if (value.prev_fallback_key->published)
@@ -588,12 +601,24 @@ namespace spank_olm
         else
         {
             pos = spank_olm::unpickle(pos, end, value.num_fallback_keys);
+            if (!pos)
+            {
+                throw SpankOlmErrorCorruptedAccountPickle();
+            }
             if (value.num_fallback_keys >= 1)
             {
                 pos = spank_olm::unpickle(pos, end, value.current_fallback_key);
+                if (!pos)
+                {
+                    throw SpankOlmErrorCorruptedAccountPickle();
+                }
                 if (value.num_fallback_keys >= 2)
                 {
                     pos = spank_olm::unpickle(pos, end, value.prev_fallback_key);
+                    if (!pos)
+                    {
+                        throw SpankOlmErrorCorruptedAccountPickle();
+                    }
                     if (value.num_fallback_keys >= 3)
                     {
                         throw SpankOlmErrorCorruptedAccountPickle();
@@ -602,7 +627,11 @@ namespace spank_olm
             }
         }
 
-        spank_olm::unpickle(pos, end, value.next_one_time_key_id);
+        pos = spank_olm::unpickle(pos, end, value.next_one_time_key_id);
+        if (!pos)
+        {
+            throw SpankOlmErrorCorruptedAccountPickle();
+        }
 
         return value;
     }

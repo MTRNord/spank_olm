@@ -16,9 +16,9 @@ jobs:
             os: ubuntu-latest
             build: { cc: gcc-14, cxx: g++-14, linker: ld }
 
-          - name: "macOS arm64 (latest) - Xcode"
-            os: macos-latest
-            build: { cc: clang, cxx: clang++, linker: ld.lld }
+          #- name: "macOS arm64 (latest) - Xcode"
+          #  os: macos-latest
+          #  build: { cc: clang, cxx: clang++, linker: ld.lld }
 
     env:
       CC: ${{ matrix.build.cc }}

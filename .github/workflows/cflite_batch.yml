@@ -21,6 +21,7 @@ jobs:
         with:
           language: c++
           sanitizer: ${{ matrix.sanitizer }}
+          storage-repo: https://github.com/MTRNord/spank_olm_fuzz_storage.git
       - name: Run Fuzzers (${{ matrix.sanitizer }})
         id: run
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
@@ -30,4 +31,4 @@ jobs:
           mode: 'batch'
           sanitizer: ${{ matrix.sanitizer }}
           output-sarif: true
-          storage-repo: https://${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/MTRNord/spank_olm_fuzz_storage.git
+          storage-repo: https://github.com/MTRNord/spank_olm_fuzz_storage.git

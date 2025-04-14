@@ -1,371 +1,27 @@
 #include "account.hpp"
 #include "errors.hpp"
+#include "pickle.hpp"
 
 #include <botan/pubkey.h>
 #include <botan/rng.h>
 
-/* Convenience macro for checking the return value of internal unpickling
- * functions and returning early on failure. */
-#ifndef UNPICKLE_OK
-#define UNPICKLE_OK(x) do { if (!(x)) return nullptr; } while(0)
-#endif
-
-
 namespace spank_olm
 {
-    /**
-     * Serializes a 32-bit unsigned integer into a byte array.
-     *
-     * @param pos Pointer to the current position in the byte array.
-     * @param value The 32-bit unsigned integer to serialize.
-     * @return Pointer to the position in the byte array after the serialized data.
-     */
-    std::uint8_t* pickle(std::uint8_t* pos, std::uint32_t value)
+
+    void Account::new_account(Botan::RandomNumberGenerator &rng)
     {
-        for (int i = 3; i >= 0; --i)
-        {
-            pos[i] = value & 0xFF;
-            value >>= 8;
-        }
-        return pos + 4;
-    }
-
-    /**
-     * Deserializes a 32-bit unsigned integer from a byte array.
-     *
-     * @param pos Pointer to the current position in the byte array.
-     * @param end Pointer to the end of the byte array.
-     * @param value Reference to the 32-bit unsigned integer to store the deserialized value.
-     * @return Pointer to the position in the byte array after the deserialized data, or nullptr on failure.
-     */
-    std::uint8_t const* unpickle(std::uint8_t const* pos, std::uint8_t const* end, std::uint32_t& value)
-    {
-        if (!pos || end < pos + 4) return nullptr;
-        value = (pos[0] << 24) | (pos[1] << 16) | (pos[2] << 8) | pos[3];
-        return pos + 4;
-    }
-
-    /**
-     * Serializes a boolean value into a byte array.
-     *
-     * @param pos Pointer to the current position in the byte array.
-     * @param value The boolean value to serialize.
-     * @return Pointer to the position in the byte array after the serialized data.
-     */
-    std::uint8_t* pickle(std::uint8_t* pos, const bool value)
-    {
-        *(pos++) = value ? 1 : 0;
-        return pos;
-    }
-
-    /**
-     * Deserializes a boolean value from a byte array.
-     *
-     * @param pos Pointer to the current position in the byte array.
-     * @param end Pointer to the end of the byte array.
-     * @param value Reference to the boolean value to store the deserialized value.
-     * @return Pointer to the position in the byte array after the deserialized data, or nullptr on failure.
-     */
-    std::uint8_t const* unpickle(std::uint8_t const* pos, std::uint8_t const* end, bool& value)
-    {
-        if (!pos || end <= pos) return nullptr;
-        value = *(pos++) != 0;
-        return pos;
-    }
-
-    /**
-     * Serializes a Botan::secure_vector<uint8_t> into a byte array.
-     *
-     * @param pos Pointer to the current position in the byte array.
-     * @param value The Botan::secure_vector<uint8_t> to serialize.
-     * @return Pointer to the position in the byte array after the serialized data.
-     */
-    std::uint8_t* pickle(std::uint8_t* pos, const Botan::secure_vector<uint8_t>& value)
-    {
-        pos = pickle(pos, static_cast<std::uint32_t>(value.size()));
-        for (const auto byte : value)
-        {
-            *(pos++) = byte;
-        }
-        return pos;
-    }
-
-    /**
-     * Deserializes a Botan::secure_vector<uint8_t> from a byte array.
-     *
-     * @param pos Pointer to the current position in the byte array.
-     * @param end Pointer to the end of the byte array.
-     * @param value Reference to the Botan::secure_vector<uint8_t> to store the deserialized value.
-     * @return Pointer to the position in the byte array after the deserialized data, or nullptr on failure.
-     */
-    std::uint8_t const* unpickle(std::uint8_t const* pos, std::uint8_t const* end, Botan::secure_vector<uint8_t>& value)
-    {
-        std::uint32_t size;
-        pos = unpickle(pos, end, size);
-        if (!pos || end < pos + size) return nullptr;
-        value.assign(pos, pos + size);
-        return pos + size;
-    }
-
-
-    /**
-       * Serializes a std::vector<uint8_t> into a byte array.
-       *
-       * @param pos Pointer to the current position in the byte array.
-       * @param value The Botan::secure_vector<uint8_t> to serialize.
-       * @return Pointer to the position in the byte array after the serialized data.
-       */
-    std::uint8_t* pickle(std::uint8_t* pos, const std::vector<uint8_t>& value)
-    {
-        pos = pickle(pos, static_cast<std::uint32_t>(value.size()));
-        for (const auto byte : value)
-        {
-            *(pos++) = byte;
-        }
-        return pos;
-    }
-
-    /**
-     * Deserializes a std::vector<uint8_t> from a byte array.
-     *
-     * @param pos Pointer to the current position in the byte array.
-     * @param end Pointer to the end of the byte array.
-     * @param value Reference to the Botan::secure_vector<uint8_t> to store the deserialized value.
-     * @return Pointer to the position in the byte array after the deserialized data, or nullptr on failure.
-     */
-    std::uint8_t const* unpickle(std::uint8_t const* pos, std::uint8_t const* end, std::vector<uint8_t>& value)
-    {
-        std::uint32_t size;
-        pos = unpickle(pos, end, size);
-        if (!pos || end < pos + size) return nullptr;
-        value.assign(pos, pos + size);
-        return pos + size;
-    }
-
-    std::uint8_t* pickle(
-        std::uint8_t* pos,
-        const std::optional<OneTimeKey>& value)
-    {
-        pos = pickle(pos, value->id);
-        pos = pickle(pos, value->published);
-        return pickle(pos, value->key.raw_private_key_bits());
-    }
-
-    /**
-     * Deserializes a OneTimeKey object from a byte array.
-     *
-     * @param pos Pointer to the current position in the byte array.
-     * @param end Pointer to the end of the byte array.
-     * @return A pair containing the pointer to the position in the byte array after the deserialized data and the deserialized OneTimeKey object.
-     */
-    static std::pair<std::uint8_t const*, std::optional<OneTimeKey>> unpickle_otk(
-        std::uint8_t const* pos, std::uint8_t const* end
-    )
-    {
-        std::uint32_t id; ///< The unique identifier for the one-time key.
-        bool published; ///< Indicates whether the key has been published.
-
-        pos = unpickle(pos, end, id);
-        if (!pos || !id)
-        {
-            return {nullptr, std::nullopt};
-        }
-        pos = unpickle(pos, end, published);
-        if (!pos) return {nullptr, std::nullopt};
-
-        Botan::secure_vector<uint8_t> key_bits;
-        pos = unpickle(pos, end, key_bits);
-        if (!pos) return {nullptr, std::nullopt};
-
-        auto otk = OneTimeKey{id, published, Botan::X25519_PrivateKey(key_bits)};
-
-        return {pos, otk};
-    }
-
-    /**
-     * Serializes a FixedSizeArray object into a byte array.
-     *
-     * @tparam T The type of elements in the FixedSizeArray.
-     * @tparam max_size The maximum size of the FixedSizeArray.
-     * @param pos Pointer to the current position in the byte array.
-     * @param list The FixedSizeArray object to serialize.
-     * @return Pointer to the position in the byte array after the serialized data.
-     */
-    template <typename T, std::size_t max_size>
-    std::uint8_t* pickle(
-        std::uint8_t* pos,
-        FixedSizeArray<T, max_size> const& list
-    )
-    {
-        pos = pickle(pos, static_cast<std::uint32_t>(list.size()));
-        for (auto const& value : list)
-        {
-            pos = pickle(pos, *value);
-        }
-        return pos;
-    }
-
-    /**
-     * Deserializes a FixedSizeArray object from a byte array.
-     *
-     * @tparam max_size The maximum size of the FixedSizeArray.
-     * @param pos Pointer to the current position in the byte array.
-     * @param end Pointer to the end of the byte array.
-     * @param list Reference to the FixedSizeArray object to store the deserialized values.
-     * @return Pointer to the position in the byte array after the deserialized data, or nullptr on failure.
-     */
-    template <std::size_t max_size>
-    std::uint8_t const* unpickle(
-        std::uint8_t const* pos, std::uint8_t const* end,
-        FixedSizeArray<OneTimeKey, max_size>& list
-    )
-    {
-        std::uint32_t size;
-        pos = unpickle(pos, end, size);
-        if (!pos)
-        {
-            return nullptr;
-        }
-
-        while (size-- && pos != end)
-        {
-            auto [temp_pos, value] = unpickle_otk(pos, end);
-            if (!((pos = temp_pos))) return nullptr;
-            list.insert(value.value());
-        }
-
-        return pos;
-    }
-
-    /**
-     * Serializes a uint8_t value into a byte array.
-     *
-     * @param pos Pointer to the current position in the byte array.
-     * @param value The uint8_t value to serialize.
-     * @return Pointer to the position in the byte array after the serialized data.
-     */
-    std::uint8_t* pickle(
-        std::uint8_t* pos,
-        const std::uint8_t value
-    )
-    {
-        *(pos++) = value;
-        return pos;
-    }
-
-    /**
-     * Deserializes a uint8_t value from a byte array.
-     *
-     * @param pos Pointer to the current position in the byte array.
-     * @param end Pointer to the end of the byte array.
-     * @param value Reference to the uint8_t value to store the deserialized value.
-     * @return Pointer to the position in the byte array after the deserialized data, or nullptr on failure.
-     */
-    std::uint8_t const* unpickle(
-        std::uint8_t const* pos, std::uint8_t const* end,
-        std::uint8_t& value
-    )
-    {
-        if (!pos || pos == end) return nullptr;
-        value = *(pos++);
-        return pos;
-    }
-
-    /**
-     * Serializes an optional IdentityKeys object into a byte array.
-     *
-     * @param pos Pointer to the current position in the byte array.
-     * @param value The optional IdentityKeys object to serialize.
-     * @return Pointer to the position in the byte array after the serialized data.
-     */
-    std::uint8_t* pickle(
-        std::uint8_t* pos,
-        const std::optional<IdentityKeys>& value)
-    {
-        pos = pickle(pos, value->ed25519_key.public_key()->raw_public_key_bits());
-        pos = pickle(pos, value->ed25519_key.raw_private_key_bits());
-        pos = pickle(pos, value->curve25519_key.public_key()->raw_public_key_bits());
-        return pickle(pos, value->curve25519_key.raw_private_key_bits());
-    }
-
-    /**
-     * Deserializes an optional IdentityKeys object from a byte array.
-     *
-     * @param pos Pointer to the current position in the byte array.
-     * @param end Pointer to the end of the byte array.
-     * @param value Reference to the optional IdentityKeys object to store the deserialized value.
-     * @return Pointer to the position in the byte array after the deserialized data, or nullptr on failure.
-     */
-    std::uint8_t const* unpickle(
-        std::uint8_t const* pos, std::uint8_t const* end,
-        std::optional<IdentityKeys>& value)
-    {
-        if (!pos || pos == end) return nullptr;
-        Botan::secure_vector<uint8_t> ed25519_public_key_bits;
-        Botan::secure_vector<uint8_t> curve25519_public_key_bits;
-        Botan::secure_vector<uint8_t> ed25519_private_key_bits;
-        Botan::secure_vector<uint8_t> curve25519_private_key_bits;
-
-        pos = unpickle(pos, end, ed25519_public_key_bits);
-        UNPICKLE_OK(pos);
-        pos = unpickle(pos, end, ed25519_private_key_bits);
-        UNPICKLE_OK(pos);
-        pos = unpickle(pos, end, curve25519_public_key_bits);
-        UNPICKLE_OK(pos);
-        pos = unpickle(pos, end, curve25519_private_key_bits);
-        UNPICKLE_OK(pos);
-        value = IdentityKeys{
-            Botan::Ed25519_PrivateKey(ed25519_private_key_bits),
-            Botan::X25519_PrivateKey(curve25519_private_key_bits)
-        };
-        return pos;
-    }
-
-    /**
-     * Deserializes an optional OneTimeKey object from a byte array.
-     *
-     * @param pos Pointer to the current position in the byte array.
-     * @param end Pointer to the end of the byte array.
-     * @param value Reference to the optional OneTimeKey object to store the deserialized value.
-     * @return Pointer to the position in the byte array after the deserialized data, or nullptr on failure.
-     */
-    std::uint8_t const* unpickle(
-        std::uint8_t const* pos, std::uint8_t const* end,
-        std::optional<OneTimeKey>& value)
-    {
-        if (!pos || pos == end) return nullptr;
-        std::uint32_t id;
-        bool published;
-        Botan::secure_vector<uint8_t> key_bits;
-        pos = unpickle(pos, end, id);
-        UNPICKLE_OK(pos);
-        pos = unpickle(pos, end, published);
-        UNPICKLE_OK(pos);
-        pos = unpickle(pos, end, key_bits);
-        UNPICKLE_OK(pos);
-        value = OneTimeKey{id, published, Botan::X25519_PrivateKey(key_bits)};
-        return pos;
-    }
-
-    void Account::new_account(Botan::RandomNumberGenerator& rng)
-    {
-        identity_keys = IdentityKeys{
-            Botan::Ed25519_PrivateKey(rng),
-            Botan::X25519_PrivateKey(rng)
-        };
+        identity_keys = IdentityKeys{Botan::Ed25519_PrivateKey(rng), Botan::X25519_PrivateKey(rng)};
 
         // Make sure we check the key pairs.
-        if (!identity_keys->ed25519_key.check_key(rng, false) ||
-            !identity_keys->curve25519_key.check_key(rng, false) ||
+        if (!identity_keys->ed25519_key.check_key(rng, false) || !identity_keys->curve25519_key.check_key(rng, false) ||
             !identity_keys->ed25519_key.public_key()->check_key(rng, false) ||
-            !identity_keys->curve25519_key.public_key()->check_key(rng, false)
-        )
+            !identity_keys->curve25519_key.public_key()->check_key(rng, false))
         {
             throw SpankOlmErrorKeyGeneration();
         }
     }
 
-    std::vector<uint8_t> Account::sign(Botan::RandomNumberGenerator& rng, const std::string_view message) const
+    std::vector<uint8_t> Account::sign(Botan::RandomNumberGenerator &rng, const std::string_view message) const
     {
         // According to https://botan.randombit.net/handbook/api_ref/pubkey.html#ed25519-ed448-variants
         const std::string padding_scheme = "Ed25519ph";
@@ -383,7 +39,7 @@ namespace spank_olm
     std::size_t Account::mark_keys_as_published()
     {
         auto count = 0;
-        for (const auto& key : one_time_keys)
+        for (const auto &key : one_time_keys)
         {
             if (!key->published)
             {
@@ -396,7 +52,7 @@ namespace spank_olm
         return count;
     }
 
-    void Account::generate_one_time_keys(Botan::RandomNumberGenerator& rng, const std::size_t number_of_keys)
+    void Account::generate_one_time_keys(Botan::RandomNumberGenerator &rng, const std::size_t number_of_keys)
     {
         for (std::size_t i = 0; i < number_of_keys; ++i)
         {
@@ -404,7 +60,7 @@ namespace spank_olm
         }
     }
 
-    void Account::generate_fallback_key(Botan::RandomNumberGenerator& rng)
+    void Account::generate_fallback_key(Botan::RandomNumberGenerator &rng)
     {
         prev_fallback_key = current_fallback_key;
         current_fallback_key = OneTimeKey{++next_one_time_key_id, false, Botan::X25519_PrivateKey(rng)};
@@ -419,32 +75,32 @@ namespace spank_olm
         }
     }
 
-    std::optional<OneTimeKey const*> Account::lookup_key(Botan::Public_Key const& key) const
+    std::optional<OneTimeKey const *> Account::lookup_key(Botan::Public_Key const &key) const
     {
-        for (const auto& one_time_key : one_time_keys)
+        for (const auto &one_time_key : one_time_keys)
         {
             if (one_time_key->key.public_key()->raw_public_key_bits() == key.raw_public_key_bits())
             {
                 return one_time_key;
             }
         }
-        if (current_fallback_key && current_fallback_key->key.public_key()->raw_public_key_bits() == key.
-            raw_public_key_bits())
+        if (current_fallback_key &&
+            current_fallback_key->key.public_key()->raw_public_key_bits() == key.raw_public_key_bits())
         {
             return &current_fallback_key.value();
         }
-        if (prev_fallback_key && prev_fallback_key->key.public_key()->raw_public_key_bits() == key.
-            raw_public_key_bits())
+        if (prev_fallback_key &&
+            prev_fallback_key->key.public_key()->raw_public_key_bits() == key.raw_public_key_bits())
         {
             return &current_fallback_key.value();
         }
         return std::nullopt;
     }
 
-    void Account::remove_key(Botan::Public_Key const& key)
+    void Account::remove_key(Botan::Public_Key const &key)
     {
         // Use iterator to find and remove the key.
-        for (const auto& one_time_key : one_time_keys)
+        for (const auto &one_time_key : one_time_keys)
         {
             if (one_time_key->key.public_key()->raw_public_key_bits() == key.raw_public_key_bits())
             {
@@ -461,19 +117,20 @@ namespace spank_olm
          * \brief The current version of the account pickle format.
          *
          * \details
-         * - Version 1 used only 32 bytes for the ed25519 private key. Any keys thus used should be considered compromised.
+         * - Version 1 used only 32 bytes for the ed25519 private key. Any keys thus used should be considered
+         * compromised.
          * - Version 2 does not have fallback keys.
          * - Version 3 does not store whether the current fallback key is published.
          */
         constexpr std::uint32_t ACCOUNT_PICKLE_VERSION = 4;
-    }
+    } // namespace
 
 
     /**
- * Serializes the Account object into a byte array.
- *
- * @return A vector of uint8_t containing the serialized data.
- */
+     * Serializes the Account object into a byte array.
+     *
+     * @return A vector of uint8_t containing the serialized data.
+     */
     std::vector<uint8_t> Account::pickle() const
     {
         std::vector<uint8_t> buffer(1024); // Initial buffer size, can be adjusted
@@ -487,8 +144,10 @@ namespace spank_olm
 
         // Calculate the number of fallback keys
         std::uint8_t fallback_key_count = 0;
-        if (current_fallback_key && current_fallback_key->published) fallback_key_count++;
-        if (prev_fallback_key && prev_fallback_key->published) fallback_key_count++;
+        if (current_fallback_key && current_fallback_key->published)
+            fallback_key_count++;
+        if (prev_fallback_key && prev_fallback_key->published)
+            fallback_key_count++;
 
         // Serialize the fallback key count
         pos = spank_olm::pickle(pos, fallback_key_count);
@@ -518,7 +177,7 @@ namespace spank_olm
      * @throws SpankOlmErrorUnknownPickleVersion if the pickle version is unknown.
      * @throws SpankOlmErrorCorruptedAccountPickle if the pickle data is corrupted.
      */
-    Account Account::unpickle(std::vector<uint8_t> const& data)
+    Account Account::unpickle(std::vector<uint8_t> const &data)
     {
         Account value;
         auto pos = data.data();
@@ -605,4 +264,4 @@ namespace spank_olm
 
         return value;
     }
-}
+} // namespace spank_olm

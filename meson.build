@@ -27,7 +27,7 @@ is_wasm = host_machine.system() == 'emscripten'
 # Add specific arguments for WASM
 if is_wasm
     add_project_arguments('-flto', language : 'cpp')
-    add_project_link_arguments('-flto', '-lembind', '-sEMBIND_AOT=1', '-sEXPORT_ES6=1', '-sMODULARIZE=1', '-sENVIRONMENT=web', '-sEXPORT_NAME=SpankOlmLibrarys', '-sFILESYSTEM=0', '-sEXPORT_ALL=1', '--emit-tsd=interface.d.ts', language : 'cpp')
+    add_project_link_arguments('-flto', '-lembind', '-sEMBIND_AOT=1', '-sEXPORT_ES6=1', '-sMODULARIZE=1', '-sENVIRONMENT=web,worker', '-sEXPORT_NAME=SpankOlmLibrarys', '-sFILESYSTEM=0', '-sEXPORT_ALL=1', '--emit-tsd=interface.d.ts', language : 'cpp')
 endif
 
 # Cmake doesnt work with meson, so we need to require pkg-config
@@ -47,7 +47,11 @@ spank_olm_deps = [botan_dep]
 
 incdir = include_directories('include')
 # List of source files
-src_files = files('src/spank-olm.cpp', 'src/account.cpp')
+src_files = files(
+    'src/spank-olm.cpp',
+    'src/account.cpp',
+    'src/megolm.cpp',
+    'src/pickle.cpp', )
 
 if is_wasm
     spank_olm = executable('spank_olm', src_files, install : true, dependencies : spank_olm_deps, include_directories : incdir, override_options : ['b_lto=false'])

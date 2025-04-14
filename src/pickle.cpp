@@ -172,8 +172,8 @@ namespace spank_olm
      * @return A pair containing the pointer to the position in the byte array after the deserialized data and the
      * deserialized OneTimeKey object.
      */
-    static std::pair<std::uint8_t const *, std::optional<OneTimeKey>> unpickle_otk(std::uint8_t const *pos,
-                                                                                   std::uint8_t const *end)
+    std::pair<std::uint8_t const *, std::optional<OneTimeKey>> unpickle_otk(std::uint8_t const *pos,
+                                                                            std::uint8_t const *end)
     {
         std::uint32_t id; ///< The unique identifier for the one-time key.
         bool published; ///< Indicates whether the key has been published.
@@ -195,57 +195,6 @@ namespace spank_olm
         auto otk = OneTimeKey{id, published, Botan::X25519_PrivateKey(key_bits)};
 
         return {pos, otk};
-    }
-
-    /**
-     * Serializes a FixedSizeArray object into a byte array.
-     *
-     * @tparam T The type of elements in the FixedSizeArray.
-     * @tparam max_size The maximum size of the FixedSizeArray.
-     * @param pos Pointer to the current position in the byte array.
-     * @param list The FixedSizeArray object to serialize.
-     * @return Pointer to the position in the byte array after the serialized data.
-     */
-    template <typename T, std::size_t max_size>
-    std::uint8_t *pickle(std::uint8_t *pos, FixedSizeArray<T, max_size> const &list)
-    {
-        pos = pickle(pos, static_cast<std::uint32_t>(list.size()));
-        for (auto const &value : list)
-        {
-            pos = pickle(pos, *value);
-        }
-        return pos;
-    }
-
-    /**
-     * Deserializes a FixedSizeArray object from a byte array.
-     *
-     * @tparam max_size The maximum size of the FixedSizeArray.
-     * @param pos Pointer to the current position in the byte array.
-     * @param end Pointer to the end of the byte array.
-     * @param list Reference to the FixedSizeArray object to store the deserialized values.
-     * @return Pointer to the position in the byte array after the deserialized data, or nullptr on failure.
-     */
-    template <std::size_t max_size>
-    std::uint8_t const *unpickle(std::uint8_t const *pos, std::uint8_t const *end,
-                                 FixedSizeArray<OneTimeKey, max_size> &list)
-    {
-        std::uint32_t size;
-        pos = unpickle(pos, end, size);
-        if (!pos)
-        {
-            return nullptr;
-        }
-
-        while (size-- && pos != end)
-        {
-            auto [temp_pos, value] = unpickle_otk(pos, end);
-            if (!((pos = temp_pos)))
-                return nullptr;
-            list.insert(value.value());
-        }
-
-        return pos;
     }
 
     /**

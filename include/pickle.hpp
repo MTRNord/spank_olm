@@ -98,8 +98,9 @@ namespace spank_olm
      * @return A pair containing the pointer to the position in the byte array after the deserialized data and the
      * deserialized OneTimeKey object.
      */
-    static std::pair<std::uint8_t const *, std::optional<OneTimeKey>> unpickle_otk(std::uint8_t const *pos,
-                                                                                   std::uint8_t const *end);
+    std::pair<std::uint8_t const *, std::optional<OneTimeKey>> unpickle_otk(std::uint8_t const *pos,
+                                                                            std::uint8_t const *end);
+
 
     /**
      * Serializes a FixedSizeArray object into a byte array.
@@ -111,7 +112,15 @@ namespace spank_olm
      * @return Pointer to the position in the byte array after the serialized data.
      */
     template <typename T, std::size_t max_size>
-    std::uint8_t *pickle(std::uint8_t *pos, FixedSizeArray<T, max_size> const &list);
+    std::uint8_t *pickle(std::uint8_t *pos, FixedSizeArray<T, max_size> const &list)
+    {
+        pos = pickle(pos, static_cast<std::uint32_t>(list.size()));
+        for (auto const &value : list)
+        {
+            pos = pickle(pos, *value);
+        }
+        return pos;
+    }
 
     /**
      * Deserializes a FixedSizeArray object from a byte array.
@@ -124,7 +133,25 @@ namespace spank_olm
      */
     template <std::size_t max_size>
     std::uint8_t const *unpickle(std::uint8_t const *pos, std::uint8_t const *end,
-                                 FixedSizeArray<OneTimeKey, max_size> &list);
+                                 FixedSizeArray<OneTimeKey, max_size> &list)
+    {
+        std::uint32_t size;
+        pos = unpickle(pos, end, size);
+        if (!pos)
+        {
+            return nullptr;
+        }
+
+        while (size-- && pos != end)
+        {
+            auto [temp_pos, value] = unpickle_otk(pos, end);
+            if (!((pos = temp_pos)))
+                return nullptr;
+            list.insert(value.value());
+        }
+
+        return pos;
+    }
 
     /**
      * Serializes a uint8_t value into a byte array.

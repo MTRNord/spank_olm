@@ -2,19 +2,20 @@
 
 export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="$WORK/lib/pkgconfig"
-export CPPFLAGS="-I$WORK/include"
-export LDFLAGS="-L$WORK/lib"
 
 # Run as many parallel jobs as there are available CPU cores
 export MAKEFLAGS="-j$(nproc)"
 
 # botan
 pushd ../botan
-./configure.py --prefix="${WORK}"
+./configure.py --prefix="${WORK}" --with-sanitizers
 make
 make install
 cp build/botan-3.pc "${PKG_CONFIG_PATH}"
 popd
+
+export CPPFLAGS="-I$WORK/include"
+export LDFLAGS="-L$WORK/lib"
 
 # spank-olm
 meson setup build --prefix="${WORK}" --libdir=lib --prefer-static --default-library=static --buildtype=debugoptimized \

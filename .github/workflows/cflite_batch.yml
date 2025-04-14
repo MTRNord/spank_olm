@@ -1,7 +1,7 @@
 name: ClusterFuzzLite batch fuzzing
 on:
   schedule:
-    - cron: '0 0 * * *'  # Every 6th hour. Change this to whatever is suitable.
+    - cron: '0 0/6 * * *' # Every 6th hour. Change this to whatever is suitable.
   workflow_dispatch:
 permissions: read-all
 jobs:
@@ -30,22 +30,4 @@ jobs:
           mode: 'batch'
           sanitizer: ${{ matrix.sanitizer }}
           output-sarif: true
-          storage-repo: https://${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/MTRNord/spank_olm_fuzz_storage.git
-  Coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Build Fuzzers
-        id: build
-        uses: google/clusterfuzzlite/actions/build_fuzzers@v1
-        with:
-          language: c++
-          sanitizer: coverage
-      - name: Run Fuzzers
-        id: run
-        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          fuzz-seconds: 600
-          mode: 'coverage'
-          sanitizer: 'coverage'
           storage-repo: https://${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/MTRNord/spank_olm_fuzz_storage.git

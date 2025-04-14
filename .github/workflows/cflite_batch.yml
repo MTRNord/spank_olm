@@ -30,11 +30,7 @@ jobs:
           mode: 'batch'
           sanitizer: ${{ matrix.sanitizer }}
           output-sarif: true
-          # Optional but recommended: For storing certain artifacts from fuzzing.
-          # See later section on "Git repo for storage".
-          # storage-repo: https://${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/OWNER/STORAGE-REPO-NAME.git
-          # storage-repo-branch: main   # Optional. Defaults to "main"
-          # storage-repo-branch-coverage: gh-pages  # Optional. Defaults to "gh-pages".
+          storage-repo: https://${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/MTRNord/spank_olm_fuzz_storage.git
   Coverage:
     runs-on: ubuntu-latest
     steps:
@@ -52,8 +48,4 @@ jobs:
           fuzz-seconds: 600
           mode: 'coverage'
           sanitizer: 'coverage'
-          # Optional but recommended.
-          # See later section on "Git repo for storage".
-          # storage-repo: https://${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/OWNER/STORAGE-REPO-NAME.git
-          # storage-repo-branch: main   # Optional. Defaults to "main"
-          # storage-repo-branch-coverage: gh-pages  # Optional. Defaults to "gh-pages".
+          storage-repo: https://${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/MTRNord/spank_olm_fuzz_storage.git

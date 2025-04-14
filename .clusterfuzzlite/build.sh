@@ -28,24 +28,4 @@ find build/fuzz -maxdepth 1 -executable -type f -exec cp -v '{}' "${OUT}" \;
 mkdir -p "${OUT}"
 cp ${WORK}/lib/*.so "${OUT}/lib"
 
-# TODO: This is from libvips and needs adjusting:
-
-## Merge the seed corpus in a single directory, exclude files larger than 4k
-#mkdir -p fuzz/corpus
-#find \
-#  $SRC/afl-testcases/{gif*,jpeg*,png,tiff,webp}/full/images \
-#  fuzz/*_fuzzer_corpus \
-#  test/test-suite/images \
-#  -type f -size -4k \
-#  -exec bash -c 'hash=($(sha1sum {})); mv {} fuzz/corpus/$hash' \;
-#zip -jrq $OUT/seed_corpus.zip fuzz/corpus
-#
-## Link corpus
-#for fuzzer in fuzz/*_fuzzer.cc; do
-#  target=$(basename "$fuzzer" .cc)
-#  ln -sf "seed_corpus.zip" "$OUT/${target}_seed_corpus.zip"
-#done
-#
-## Copy options and dictionary files to $OUT
-#find fuzz -name '*_fuzzer.dict' -exec cp -v '{}' $OUT \;
-#find fuzz -name '*_fuzzer.options' -exec cp -v '{}' $OUT \;
+mv "${SRC}/spank-olm/fuzz/corpuses/sign.zip" "${OUT}/olm_sign_fuzzer_seed_corpus.zip"

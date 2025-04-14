@@ -5,7 +5,14 @@ RUN apt-get update && apt-get install -y \
   cmake \
   git \
   python3-pip \
-  pkg-config
+  pkg-config \
+  # Install the sanitizers
+  libasan4 \
+  liblsan0 \
+  libtsan0 \
+  libubsan1
+
+
 RUN pip3 install meson ninja
 
 RUN git clone --depth 1 https://github.com/randombit/botan.git

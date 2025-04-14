@@ -12,23 +12,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: "Linux x64 (Ubuntu 24.04) - GCC 14"
-            os: ubuntu-24.04
+          - name: "Linux x64 (Ubuntu Latest) - GCC 14"
+            os: ubuntu-latest
             build: { cc: gcc-14, cxx: g++-14, linker: ld }
 
-          - name: "Linux x64 (Ubuntu 24.04) - Clang 18 with ASan and UBSan"
-            os: ubuntu-24.04
-            build: { cc: clang-18, cxx: clang++-18, linker: ld.lld-18, sanitize: true }
-
-          - name: "macOS arm64 (14) - Xcode 15"
-            os: macos-14
+          - name: "macOS arm64 (latest) - Xcode"
+            os: macos-latest
             build: { cc: clang, cxx: clang++, linker: ld.lld }
 
     env:
       CC: ${{ matrix.build.cc }}
       CXX: ${{ matrix.build.cxx }}
       LD: ${{ matrix.build.linker }}
-      CPPFLAGS: -Wall
+      CPPFLAGS: -Wall -Werror
 
     steps:
       - name: Checkout code
@@ -48,35 +44,11 @@ jobs:
           brew install \
             ninja pkg-config
 
-      - name: Install Clang 18
-        if: runner.os == 'Linux' && matrix.build.cc == 'clang-18'
-        run: sudo apt-get install clang-18 libomp-18-dev lld-18 llvm-18
-
 
       - name: Prepare macOS environment
         if: runner.os == 'macOS'
         run: |
           echo "PKG_CONFIG_PATH=$(brew --prefix botan)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-
-      - name: Prepare sanitizers
-        if: matrix.build.sanitize
-        env:
-          LLVM_PREFIX: /usr/lib/llvm-18
-        run: |
-          ASAN_DSO=`$CC -print-file-name=libclang_rt.asan-x86_64.so`
-          echo "LDSHARED=$CC -shared" >> $GITHUB_ENV
-          echo "CPPFLAGS=-g -fsanitize=address,undefined -fno-sanitize=function -fno-omit-frame-pointer -fopenmp -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION" >> $GITHUB_ENV
-          echo "LDFLAGS=-g -fsanitize=address,undefined -shared-libasan -fopenmp=libomp" >> $GITHUB_ENV
-          echo "ASAN_DSO=$ASAN_DSO" >> $GITHUB_ENV
-          # Glib is built without -fno-omit-frame-pointer. We need
-          # to disable the fast unwinder to get full stacktraces.
-          echo "ASAN_OPTIONS=suppressions=${{ github.workspace }}/suppressions/asan.supp:fast_unwind_on_malloc=0:allocator_may_return_null=1" >> $GITHUB_ENV
-          echo "LSAN_OPTIONS=suppressions=${{ github.workspace }}/suppressions/lsan.supp:fast_unwind_on_malloc=0" >> $GITHUB_ENV
-          echo "TSAN_OPTIONS=suppressions=${{ github.workspace }}/suppressions/tsan.supp" >> $GITHUB_ENV
-          # Ensure UBSan issues causes the program to abort.
-          echo "UBSAN_OPTIONS=suppressions=${{ github.workspace }}/suppressions/ubsan.supp:halt_on_error=1:abort_on_error=1:print_stacktrace=1" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=$LLVM_PREFIX/lib:`dirname $ASAN_DSO`" >> $GITHUB_ENV
-          echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
 
       - name: Build and install Botan
         run: |

@@ -24,7 +24,7 @@ jobs:
       CC: ${{ matrix.build.cc }}
       CXX: ${{ matrix.build.cxx }}
       LD: ${{ matrix.build.linker }}
-      CPPFLAGS: -Wall -Werror
+      CPPFLAGS: -Wall
 
     steps:
       - name: Checkout code

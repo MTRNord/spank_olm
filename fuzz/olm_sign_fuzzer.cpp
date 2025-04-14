@@ -6,7 +6,7 @@
 #include "botan/pubkey.h"
 
 // Just needed for compiling reasons
-extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) { return 0; }
+extern "C" int LLVMFuzzerInitialize() { return 0; }
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 {

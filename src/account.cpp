@@ -7,7 +7,6 @@
 
 namespace spank_olm
 {
-
     void Account::new_account(Botan::RandomNumberGenerator &rng)
     {
         identity_keys = IdentityKeys{Botan::Ed25519_PrivateKey(rng), Botan::X25519_PrivateKey(rng)};
@@ -19,6 +18,18 @@ namespace spank_olm
         {
             throw SpankOlmErrorKeyGeneration();
         }
+    }
+
+
+    [[nodiscard]] std::string Account::get_identity_json() const
+    {
+        auto curve25519_key = identity_keys->curve25519_key.public_key()->raw_public_key_bits();
+        auto ed25519_key = identity_keys->ed25519_key.public_key()->raw_public_key_bits();
+
+        const auto curve25519_base64 = Botan::base64_encode(curve25519_key);
+        const auto ed25519_base64 = Botan::base64_encode(ed25519_key);
+
+        return R"({"curve25519": ")" + curve25519_base64 + R"(", "ed25519": ")" + ed25519_base64 + "\"}";
     }
 
     std::vector<uint8_t> Account::sign(Botan::RandomNumberGenerator &rng, const std::string_view message) const

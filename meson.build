@@ -2,7 +2,7 @@ project('spank-olm', 'c', 'cpp',
         version : '1.0.0',
         default_options : [
             'c_std=c11',
-            'cpp_std=c++23',
+            'cpp_std=c++20',
             'b_lto=true',
             'b_thinlto_cache=true',
             'warning_level=3',

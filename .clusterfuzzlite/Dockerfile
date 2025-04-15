@@ -10,7 +10,8 @@ RUN apt-get update && apt-get install -y \
   libasan4 \
   liblsan0 \
   libtsan0 \
-  libubsan1
+  libubsan1 \
+  openssh-client
 
 
 RUN pip3 install meson ninja

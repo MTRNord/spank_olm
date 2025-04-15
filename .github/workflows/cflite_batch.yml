@@ -15,20 +15,35 @@ jobs:
           - undefined
           - memory
     steps:
+      - name: Add SSH key
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+        run: |
+          mkdir -p /home/runner/.ssh
+          ssh-keyscan github.com >> /home/runner/.ssh/known_hosts
+          # STORAGE_SSH_KEY is the name of the repository secret
+          echo "${{ secrets.STORAGE_SSH_KEY }}" > /home/runner/.ssh/github_actions
+          chmod 600 /home/runner/.ssh/github_actions
+          ssh-agent -a $SSH_AUTH_SOCK > /dev/null	
+          ssh-add /home/runner/.ssh/github_actions
       - name: Build Fuzzers (${{ matrix.sanitizer }})
         id: build
         uses: google/clusterfuzzlite/actions/build_fuzzers@v1
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         with:
           language: c++
           sanitizer: ${{ matrix.sanitizer }}
-          storage-repo: https://github.com/MTRNord/spank_olm_fuzz_storage.git
+          storage-repo: git@github.com:MTRNord/spank_olm_fuzz_storage.git
       - name: Run Fuzzers (${{ matrix.sanitizer }})
         id: run
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fuzz-seconds: 3600
           mode: 'batch'
           sanitizer: ${{ matrix.sanitizer }}
           output-sarif: true
-          storage-repo: https://github.com/MTRNord/spank_olm_fuzz_storage.git
+          storage-repo: git@github.com:MTRNord/spank_olm_fuzz_storage.git

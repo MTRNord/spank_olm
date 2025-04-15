@@ -11,7 +11,6 @@ jobs:
         env:
           SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         run: |
-          sudo apt-get install -y openssh-client
           mkdir -p /home/runner/.ssh
           ssh-keyscan github.com >> /home/runner/.ssh/known_hosts
           # STORAGE_SSH_KEY is the name of the repository secret
@@ -26,7 +25,7 @@ jobs:
           SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         with:
           language: c++
-          storage-repo: https://github.com/MTRNord/spank_olm_fuzz_storage.git
+          storage-repo: https://MTRNord:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/MTRNord/spank_olm_fuzz_storage.git
       - name: Run Fuzzers
         id: run
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
@@ -37,7 +36,7 @@ jobs:
           fuzz-seconds: 600
           mode: 'prune'
           output-sarif: true
-          storage-repo: https://github.com/MTRNord/spank_olm_fuzz_storage.git
+          storage-repo: https://MTRNord:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/MTRNord/spank_olm_fuzz_storage.git
   Coverage:
     runs-on: ubuntu-latest
     steps:
@@ -45,7 +44,6 @@ jobs:
         env:
           SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         run: |
-          sudo apt-get install -y openssh-client
           mkdir -p /home/runner/.ssh
           ssh-keyscan github.com >> /home/runner/.ssh/known_hosts
           # STORAGE_SSH_KEY is the name of the repository secret
@@ -61,7 +59,7 @@ jobs:
         with:
           language: c++
           sanitizer: coverage
-          storage-repo: git@github.com:MTRNord/spank_olm_fuzz_storage.git
+          storage-repo: https://MTRNord:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/MTRNord/spank_olm_fuzz_storage.git
       - name: Run Fuzzers
         id: run
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
@@ -72,5 +70,5 @@ jobs:
           fuzz-seconds: 600
           mode: 'coverage'
           sanitizer: 'coverage'
-          storage-repo: git@github.com:MTRNord/spank_olm_fuzz_storage.git
+          storage-repo: https://MTRNord:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/MTRNord/spank_olm_fuzz_storage.git
 

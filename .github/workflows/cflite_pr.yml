@@ -22,7 +22,6 @@ jobs:
         env:
           SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         run: |
-          sudo apt-get install -y openssh-client
           mkdir -p /home/runner/.ssh
           ssh-keyscan github.com >> /home/runner/.ssh/known_hosts
           # STORAGE_SSH_KEY is the name of the repository secret
@@ -39,7 +38,7 @@ jobs:
           language: c++
           github-token: ${{ secrets.GITHUB_TOKEN }}
           sanitizer: ${{ matrix.sanitizer }}
-          storage-repo: git@github.com:MTRNord/spank_olm_fuzz_storage.git
+          storage-repo: https://MTRNord:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/MTRNord/spank_olm_fuzz_storage.git
       - name: Run Fuzzers (${{ matrix.sanitizer }})
         id: run
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
@@ -51,4 +50,4 @@ jobs:
           mode: 'code-change'
           sanitizer: ${{ matrix.sanitizer }}
           output-sarif: true
-          storage-repo: git@github.com:MTRNord/spank_olm_fuzz_storage.git
+          storage-repo: https://MTRNord:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/MTRNord/spank_olm_fuzz_storage.git
